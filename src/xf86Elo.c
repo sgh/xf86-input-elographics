@@ -22,7 +22,7 @@
  *
  */
 
-/* $XFree86: xc/programs/Xserver/hw/xfree86/input/elographics/xf86Elo.c,v 1.13 2001/04/01 14:00:13 tsi Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/input/elographics/xf86Elo.c,v 1.14 2001/08/17 13:27:56 dawes Exp $ */
 
 /*
  *******************************************************************************
