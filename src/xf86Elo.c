@@ -720,7 +720,7 @@ xf86EloConvert(LocalDevicePtr	local,
     return FALSE;
   }
 
-  DBG(3, ErrorF("EloConvert: v0(%d), v1(%d)\n",	v0, v1));
+  DBG(3, ErrorF("EloConvert: Screen(%d) - v0(%d), v1(%d)\n", priv->screen_no, v0, v1));
 
   if (priv->swap_axes) {
     input_x = v1;
@@ -733,17 +733,23 @@ xf86EloConvert(LocalDevicePtr	local,
   *x = (priv->screen_width * (input_x - priv->min_x)) / width;
   *y = (priv->screen_height -
 	(priv->screen_height * (input_y - priv->min_y)) / height);
-  
+
+  /* 
+   * MHALAS: Based on the description in xf86XInputSetScreen
+   * this code must be called from ReadInput BEFORE any events
+   * are posted but this method is called FROM xf86PostMotionEvent
+   * Therefore I have moved this method into xf86EloReadInput
+   */
 #ifdef XFREE86_V4
   /*
    * Need to check if still on the correct screen.
    * This call is here so that this work can be done after
    * calib and before posting the event.
    */
-  xf86XInputSetScreen(local, priv->screen_no, *x, *y);
+/*  xf86XInputSetScreen(local, priv->screen_no, *x, *y); */
 #endif
   
-  DBG(3, ErrorF("EloConvert: x(%d), y(%d)\n",	*x, *y));
+  DBG(3, ErrorF("EloConvert: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, *x, *y));
 
   return TRUE;
 }
@@ -780,6 +786,18 @@ xf86EloReadInput(LocalDevicePtr	local)
   EloPrivatePtr			priv = (EloPrivatePtr)(local->private);
   int				cur_x, cur_y;
   int				state;
+#ifdef XFREE86_V4
+   int first = 0; /* since convert is expecting 0 */
+   int num = 2; /* since convert is expecting 0 */
+   int v0 = 0; /* = cur_x - based on the debug output this is what v0 is */
+   int v1 = 0; /* = cur_y based on the debug output this is what v0 is */
+   int v2 = 0; /* not used in convert */
+   int v3 = 0; /* not used in convert */
+   int v4 = 0; /* not used in convert */
+   int v5 = 0; /* not used in convert */
+   int x; /* output */
+   int y; /* output */
+#endif
 
   DBG(4, ErrorF("Entering ReadInput\n"));
   /*
@@ -802,6 +820,32 @@ xf86EloReadInput(LocalDevicePtr	local)
     cur_x = WORD_ASSEMBLY(priv->packet_buf[3], priv->packet_buf[4]);
     cur_y = WORD_ASSEMBLY(priv->packet_buf[5], priv->packet_buf[6]);
     state = priv->packet_buf[2] & 0x07;
+
+  /* 
+   * MHALAS: Based on the description in xf86XInputSetScreen
+   * this code must be called from ReadInput BEFORE any events
+   * are posted but this method is called FROM xf86PostMotionEvent
+   * Therefore I have moved this method into xf86EloReadInput
+   */
+#ifdef XFREE86_V4
+  /*
+   * Need to check if still on the correct screen.
+   * This call is here so that this work can be done after
+   * calib and before posting the event.
+   */
+
+   DBG(3, ErrorF("EloConvert Before Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
+   v0 = cur_x; /* based on the debug output this is what v0 is */
+   v1 = cur_y; /* based on the debug output this is what v0 is */
+   /* 
+    * Use the conversion method to send correct coordinates
+    * since it contains all necessary logic
+    */
+   xf86EloConvert(local, first, num, v0, v1, v2, v3, v4, v5, &x, &y);
+   DBG(3, ErrorF("EloConvert During Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
+   xf86XInputSetScreen(local, priv->screen_no, x, y);
+   DBG(3, ErrorF("EloConvert After Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
+#endif
 
     /*
      * Send events.
