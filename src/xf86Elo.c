@@ -73,17 +73,17 @@
 
 #else /* XFREE86_V4 */
 
-#include "Xos.h"
+#include <X11/Xos.h>
 #include <signal.h>
 #include <stdio.h>
 
 #define	 NEED_EVENTS
-#include "X.h"
-#include "Xproto.h"
+#include <X11/X.h>
+#include <X11/Xproto.h>
 #include "inputstr.h"
 #include "scrnintstr.h"
-#include "XI.h"
-#include "XIproto.h"
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 
 #if defined(sun) && !defined(i386)
 #include <errno.h>
