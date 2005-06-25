@@ -1790,7 +1790,7 @@ xf86EloInit(InputDriverPtr	drv,
 #ifdef XFree86LOADER
 static
 #endif
-InputDriverRec ELOGRAPHICS = {
+_X_EXPORT InputDriverRec ELOGRAPHICS = {
     1,				/* driver version */
     "elographics",		/* driver name */
     NULL,			/* identify */
@@ -1836,7 +1836,7 @@ static XF86ModuleVersionInfo version_rec = {
  * is setup after the pattern <module_name>ModuleData.
  * Do not change it.
  */
-XF86ModuleData elographicsModuleData = { &version_rec, Plug, Unplug };
+_X_EXPORT XF86ModuleData elographicsModuleData = { &version_rec, Plug, Unplug };
 
 #endif
 #endif /* XFREE86_V4 */
