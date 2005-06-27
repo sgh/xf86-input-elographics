@@ -1787,9 +1787,6 @@ xf86EloInit(InputDriverPtr	drv,
   return local;
 }
 
-#ifdef XFree86LOADER
-static
-#endif
 _X_EXPORT InputDriverRec ELOGRAPHICS = {
     1,				/* driver version */
     "elographics",		/* driver name */
