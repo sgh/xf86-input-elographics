@@ -58,7 +58,7 @@
 #include <errno.h>
 #endif
 
-#include "misc.h"
+#include <X11/misc.h>
 #include "xf86.h"
 #if !defined(DGUX)
 #include "xf86_ansic.h"
@@ -103,7 +103,7 @@
 #endif /* defined(sun) && !defined(i386) */
 
 #if !defined(sun) || defined(i386)
-#include "os.h"
+#include <X11/os.h>
 #include "osdep.h"
 #include "exevents.h"
 
