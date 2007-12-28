@@ -1348,11 +1348,12 @@ xf86EloControl(DeviceIntPtr	dev,
 	return !Success;
       }
       else {
-	InitValuatorAxisStruct(dev, 0, priv->min_x, priv->max_x,
+	/* I will map coordinates myself */
+	InitValuatorAxisStruct(dev, 0, -1, -1,
 			       9500,
 			       0     /* min_res */,
 			       9500  /* max_res */);
-	InitValuatorAxisStruct(dev, 1, priv->min_y, priv->max_y,
+	InitValuatorAxisStruct(dev, 1, -1, -1,
 			       10500,
 			       0     /* min_res */,
 			       10500 /* max_res */);
