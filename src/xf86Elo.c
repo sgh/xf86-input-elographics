@@ -858,13 +858,13 @@ xf86EloReadInput(LocalDevicePtr	local)
      * location has changed as DIX assumes this. This is why we always
      * emit a motion, regardless of the kind of packet processed.
      */
-    xf86PostMotionEvent(local->dev, TRUE, 0, 2, cur_x, cur_y);
+    xf86PostMotionEvent(local->dev, TRUE, 0, 2, x, y);
     
     /*
      * Emit a button press or release.
      */
     if (state == ELO_PRESS || state == ELO_RELEASE) {
-      xf86PostButtonEvent(local->dev, TRUE, 1, state == ELO_PRESS, 0, 2, cur_x, cur_y);
+      xf86PostButtonEvent(local->dev, TRUE, 1, state == ELO_PRESS, 0, 2, x, y);
     }
     
     DBG(3, ErrorF("TouchScreen: x(%d), y(%d), %s\n",
