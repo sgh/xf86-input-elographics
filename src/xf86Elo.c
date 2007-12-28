@@ -1691,6 +1691,7 @@ xf86EloInit(InputDriverPtr	drv,
   EloPrivatePtr		priv=NULL;
   char			*str;
   int			portrait = 0;
+  int			height, width;
   
   local = xf86EloAllocate(drv);
   if (!local) {
@@ -1757,11 +1758,21 @@ xf86EloInit(InputDriverPtr	drv,
     str = "Landscape";
   }
   xf86Msg(X_CONFIG, "Elographics device will work in %s mode\n", str);      
-  
-  if (priv->max_x - priv->min_x <= 0) {
+
+  width = priv->max_x - priv->min_x;
+  height = priv->max_y - priv->min_y;
+  if (width == 0) {
+    xf86Msg(X_ERROR, "Elographics: Cannot configure touchscreen with width 0\n");
+    return local;
+  }
+  else if (width < 0) {
     xf86Msg(X_INFO, "Elographics: reverse x mode (minimum x position >= maximum x position)\n");
-  }  
-  if (priv->max_y - priv->min_y <= 0) {
+  }
+  if (height == 0) {
+    xf86Msg(X_ERROR, "Elographics: Cannot configure touchscreen with height 0\n");
+    return local;
+  }
+  else if (height < 0) {
     xf86Msg(X_INFO, "Elographics: reverse y mode (minimum y position >= maximum y position)\n");
   }
 
