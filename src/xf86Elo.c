@@ -804,69 +804,67 @@ xf86EloReadInput(LocalDevicePtr	local)
   /*
    * Try to get a packet.
    */
-  if (xf86EloGetPacket(priv->packet_buf,
+  while (xf86EloGetPacket(priv->packet_buf,
 		       &priv->packet_buf_p,
 		       &priv->checksum,
-		       local->fd) != Success) {
-    return;
-  }
+		       local->fd) == Success) {
+      /*
+       * Process only ELO_TOUCHs here.
+       */
+      if (priv->packet_buf[1] == ELO_TOUCH) {
+          /*
+           * First stick together the various pieces.
+           */
+          cur_x = WORD_ASSEMBLY(priv->packet_buf[3], priv->packet_buf[4]);
+          cur_y = WORD_ASSEMBLY(priv->packet_buf[5], priv->packet_buf[6]);
+          state = priv->packet_buf[2] & 0x07;
 
-  /*
-   * Process only ELO_TOUCHs here.
-   */
-  if (priv->packet_buf[1] == ELO_TOUCH) {
-    /*
-     * First stick together the various pieces.
-     */
-    cur_x = WORD_ASSEMBLY(priv->packet_buf[3], priv->packet_buf[4]);
-    cur_y = WORD_ASSEMBLY(priv->packet_buf[5], priv->packet_buf[6]);
-    state = priv->packet_buf[2] & 0x07;
-
-  /* 
-   * MHALAS: Based on the description in xf86XInputSetScreen
-   * this code must be called from ReadInput BEFORE any events
-   * are posted but this method is called FROM xf86PostMotionEvent
-   * Therefore I have moved this method into xf86EloReadInput
-   */
+          /* 
+           * MHALAS: Based on the description in xf86XInputSetScreen
+           * this code must be called from ReadInput BEFORE any events
+           * are posted but this method is called FROM xf86PostMotionEvent
+           * Therefore I have moved this method into xf86EloReadInput
+           */
 #ifdef XFREE86_V4
-  /*
-   * Need to check if still on the correct screen.
-   * This call is here so that this work can be done after
-   * calib and before posting the event.
-   */
+          /*
+           * Need to check if still on the correct screen.
+           * This call is here so that this work can be done after
+           * calib and before posting the event.
+           */
 
-   DBG(3, ErrorF("EloConvert Before Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
-   v0 = cur_x; /* based on the debug output this is what v0 is */
-   v1 = cur_y; /* based on the debug output this is what v0 is */
-   /* 
-    * Use the conversion method to send correct coordinates
-    * since it contains all necessary logic
-    */
-   xf86EloConvert(local, first, num, v0, v1, v2, v3, v4, v5, &x, &y);
-   DBG(3, ErrorF("EloConvert During Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
-   xf86XInputSetScreen(local, priv->screen_no, x, y);
-   DBG(3, ErrorF("EloConvert After Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
+          DBG(3, ErrorF("EloConvert Before Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
+          v0 = cur_x; /* based on the debug output this is what v0 is */
+          v1 = cur_y; /* based on the debug output this is what v0 is */
+          /* 
+           * Use the conversion method to send correct coordinates
+           * since it contains all necessary logic
+           */
+          xf86EloConvert(local, first, num, v0, v1, v2, v3, v4, v5, &x, &y);
+          DBG(3, ErrorF("EloConvert During Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
+          xf86XInputSetScreen(local, priv->screen_no, x, y);
+          DBG(3, ErrorF("EloConvert After Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
 #endif
 
-    /*
-     * Send events.
-     *
-     * We *must* generate a motion before a button change if pointer
-     * location has changed as DIX assumes this. This is why we always
-     * emit a motion, regardless of the kind of packet processed.
-     */
-    xf86PostMotionEvent(local->dev, TRUE, 0, 2, x, y);
-    
-    /*
-     * Emit a button press or release.
-     */
-    if (state == ELO_PRESS || state == ELO_RELEASE) {
-      xf86PostButtonEvent(local->dev, TRUE, 1, state == ELO_PRESS, 0, 2, x, y);
-    }
-    
-    DBG(3, ErrorF("TouchScreen: x(%d), y(%d), %s\n",
-		  cur_x, cur_y,
-		  (state == ELO_PRESS) ? "Press" : ((state == ELO_RELEASE) ? "Release" : "Stream")));
+          /*
+           * Send events.
+           *
+           * We *must* generate a motion before a button change if pointer
+           * location has changed as DIX assumes this. This is why we always
+           * emit a motion, regardless of the kind of packet processed.
+           */
+          xf86PostMotionEvent(local->dev, TRUE, 0, 2, x, y);
+
+          /*
+           * Emit a button press or release.
+           */
+          if (state == ELO_PRESS || state == ELO_RELEASE) {
+              xf86PostButtonEvent(local->dev, TRUE, 1, state == ELO_PRESS, 0, 2, x, y);
+          }
+
+          DBG(3, ErrorF("TouchScreen: x(%d), y(%d), %s\n",
+                      cur_x, cur_y,
+                      (state == ELO_PRESS) ? "Press" : ((state == ELO_RELEASE) ? "Release" : "Stream")));
+      }
   }
 }
 
