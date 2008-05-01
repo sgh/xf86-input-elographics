@@ -723,6 +723,9 @@ xf86EloConvert(LocalDevicePtr	local,
 
   DBG(3, ErrorF("EloConvert: Screen(%d) - v0(%d), v1(%d)\n", priv->screen_no, v0, v1));
 
+  if (width == 0) width = 1;
+  if (height == 0) height = 1;
+
   if (priv->swap_axes) {
     input_x = v1;
     input_y = v0;
