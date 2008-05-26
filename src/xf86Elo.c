@@ -1340,7 +1340,10 @@ xf86EloControl(DeviceIntPtr	dev,
        * max and min values scaled from the approximate size of the
        * screen to fit one meter.
        */
-      if (InitValuatorClassDeviceStruct(dev, 2, xf86GetMotionEvents,
+      if (InitValuatorClassDeviceStruct(dev, 2,
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) < 3
+                  xf86GetMotionEvents,
+#endif
 					local->history_size, Absolute) == FALSE) {
 	ErrorF("Unable to allocate Elographics touchscreen ValuatorClassDeviceStruct\n");
 	return !Success;
