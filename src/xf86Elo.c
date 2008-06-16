@@ -807,10 +807,13 @@ xf86EloReadInput(LocalDevicePtr	local)
   /*
    * Try to get a packet.
    */
-  while (xf86EloGetPacket(priv->packet_buf,
+  while (xf86WaitForInput(local->fd, ELO_MAX_WAIT) > 0) {
+      if(xf86EloGetPacket(priv->packet_buf,
 		       &priv->packet_buf_p,
 		       &priv->checksum,
-		       local->fd) == Success) {
+		       local->fd) != Success)
+          break;
+
       /*
        * Process only ELO_TOUCHs here.
        */
