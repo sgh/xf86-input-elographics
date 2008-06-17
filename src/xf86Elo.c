@@ -1,4 +1,3 @@
-/* $XConsortium: xf86Elo.c /main/13 1996/10/25 14:11:31 kaleb $ */
 /*
  * Copyright 1995, 1999 by Patrick Lecoanet, France. <lecoanet@cena.dgac.fr>
  *
@@ -21,8 +20,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  *
  */
-
-/* $XFree86: xc/programs/Xserver/hw/xfree86/input/elographics/xf86Elo.c,v 1.13 2001/04/01 14:00:13 tsi Exp $ */
 
 /*
  *******************************************************************************
