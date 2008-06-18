@@ -392,6 +392,7 @@ xf86EloReadInput(LocalDevicePtr	local)
   EloPrivatePtr			priv = (EloPrivatePtr)(local->private);
   int				cur_x, cur_y;
   int				state;
+#if GET_ABI_MAJOR(XINPUT_ABI) == 0
    int first = 0; /* since convert is expecting 0 */
    int num = 2; /* since convert is expecting 0 */
    int v0 = 0; /* = cur_x - based on the debug output this is what v0 is */
@@ -400,14 +401,13 @@ xf86EloReadInput(LocalDevicePtr	local)
    int v3 = 0; /* not used in convert */
    int v4 = 0; /* not used in convert */
    int v5 = 0; /* not used in convert */
-   int x; /* output */
-   int y; /* output */
+#endif
 
   DBG(4, ErrorF("Entering ReadInput\n"));
   /*
    * Try to get a packet.
    */
-  while (xf86WaitForInput(local->fd, ELO_MAX_WAIT) > 0) {
+  while (xf86WaitForInput(local->fd, ELO_MAX_WAIT/100) > 0) {
       if(xf86EloGetPacket(priv->packet_buf,
 		       &priv->packet_buf_p,
 		       &priv->checksum,
@@ -424,7 +424,7 @@ xf86EloReadInput(LocalDevicePtr	local)
           cur_x = WORD_ASSEMBLY(priv->packet_buf[3], priv->packet_buf[4]);
           cur_y = WORD_ASSEMBLY(priv->packet_buf[5], priv->packet_buf[6]);
           state = priv->packet_buf[2] & 0x07;
-
+#if GET_ABI_MAJOR(XINPUT_ABI) == 0
           /*
            * MHALAS: Based on the description in xf86XInputSetScreen
            * this code must be called from ReadInput BEFORE any events
@@ -437,17 +437,18 @@ xf86EloReadInput(LocalDevicePtr	local)
            * calib and before posting the event.
            */
 
-          DBG(3, ErrorF("EloConvert Before Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
+          DBG(3, ErrorF("EloConvert Before Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, cur_x, cur_y));
           v0 = cur_x; /* based on the debug output this is what v0 is */
-          v1 = cur_y; /* based on the debug output this is what v0 is */
+          v1 = cur_y; /* based on the debug output this is what v1 is */
           /*
            * Use the conversion method to send correct coordinates
            * since it contains all necessary logic
            */
-          xf86EloConvert(local, first, num, v0, v1, v2, v3, v4, v5, &x, &y);
-          DBG(3, ErrorF("EloConvert During Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
-          xf86XInputSetScreen(local, priv->screen_no, x, y);
-          DBG(3, ErrorF("EloConvert After Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, x, y));
+          xf86EloConvert(local, first, num, v0, v1, v2, v3, v4, v5, &cur_x, &cur_y);
+          DBG(3, ErrorF("EloConvert During Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, cur_x, cur_y));
+          xf86XInputSetScreen(local, priv->screen_no, cur_x, cur_y);
+          DBG(3, ErrorF("EloConvert After Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, cur_x, cur_y));
+#endif
 
           /*
            * Send events.
@@ -456,13 +457,13 @@ xf86EloReadInput(LocalDevicePtr	local)
            * location has changed as DIX assumes this. This is why we always
            * emit a motion, regardless of the kind of packet processed.
            */
-          xf86PostMotionEvent(local->dev, TRUE, 0, 2, x, y);
+          xf86PostMotionEvent(local->dev, TRUE, 0, 2, cur_x, cur_y);
 
           /*
            * Emit a button press or release.
            */
           if (state == ELO_PRESS || state == ELO_RELEASE) {
-              xf86PostButtonEvent(local->dev, TRUE, 1, state == ELO_PRESS, 0, 2, x, y);
+              xf86PostButtonEvent(local->dev, TRUE, 1, state == ELO_PRESS, 0, 2, cur_x, cur_y);
           }
 
           DBG(3, ErrorF("TouchScreen: x(%d), y(%d), %s\n",
