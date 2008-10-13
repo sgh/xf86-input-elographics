@@ -69,6 +69,7 @@
  * models to be treated specially.
  */
 #define MODEL_UNKNOWN  -1
+#define MODEL_SUNIT_D  1
 
 typedef struct {
     int         type;
@@ -77,6 +78,7 @@ typedef struct {
 
 static Model SupportedModels[] =
 {
+    {MODEL_SUNIT_D, "Sunit dSeries"}, /* sunit dSeries models don't reply to queries */
     {MODEL_UNKNOWN, NULL}
 };
 /*
@@ -860,57 +862,61 @@ xf86EloControl(DeviceIntPtr	dev,
 	Error("Unable to open Elographics touchscreen device");
 	return !Success;
       }
-      /*
-       * Try to see if the link is at the specified rate and
-       * ask the controller to report various infos.
-       */
-      memset(req, 0, ELO_PACKET_SIZE);
-      req[1] = tolower(ELO_PARAMETER);
-      if (xf86EloSendQuery(req, reply, local->fd) != Success) {
-	priv->is_a_2310 = 1;
-	ErrorF("Not at the specified rate or model 2310, will continue\n");
-      }
 
-      /*
-       * Ask the controller to report various infos.
-       */
-      memset(req, 0, ELO_PACKET_SIZE);
-      req[1] = tolower(ELO_ID);
-      if (xf86EloSendQuery(req, reply, local->fd) == Success) {
-	xf86EloPrintIdent(reply, priv);
-      }
-      else {
-	ErrorF("Unable to ask Elographics touchscreen identification\n");
-	goto not_success;
-      }
+      if (priv->model != MODEL_SUNIT_D)
+      {
+          /*
+           * Try to see if the link is at the specified rate and
+           * ask the controller to report various infos.
+           */
+          memset(req, 0, ELO_PACKET_SIZE);
+          req[1] = tolower(ELO_PARAMETER);
+          if (xf86EloSendQuery(req, reply, local->fd) != Success) {
+              priv->is_a_2310 = 1;
+              ErrorF("Not at the specified rate or model 2310, will continue\n");
+          }
 
-      /*
-       * Set the operating mode: Stream, no scaling, no calibration,
-       * no range checking, no trim, tracking enabled.
-       */
-      memset(req, 0, ELO_PACKET_SIZE);
-      req[1] = ELO_MODE;
-      req[3] = ELO_TOUCH_MODE | ELO_STREAM_MODE | ELO_UNTOUCH_MODE;
-      req[4] = ELO_TRACKING_MODE;
-      if (xf86EloSendControl(req, local->fd) != Success) {
-	ErrorF("Unable to change Elographics touchscreen operating mode\n");
-	goto not_success;
-      }
+          /*
+           * Ask the controller to report various infos.
+           */
+          memset(req, 0, ELO_PACKET_SIZE);
+          req[1] = tolower(ELO_ID);
+          if (xf86EloSendQuery(req, reply, local->fd) == Success) {
+              xf86EloPrintIdent(reply, priv);
+          }
+          else {
+              ErrorF("Unable to ask Elographics touchscreen identification\n");
+              goto not_success;
+          }
 
-      /*
-       * Set the touch reports timings from configuration data.
-       */
-      memset(req, 0, ELO_PACKET_SIZE);
-      req[1] = ELO_REPORT;
-      req[2] = priv->untouch_delay;
-      req[3] = priv->report_delay;
-      if (xf86EloSendControl(req, local->fd) != Success) {
-	ErrorF("Unable to change Elographics touchscreen reports timings\n");
+          /*
+           * Set the operating mode: Stream, no scaling, no calibration,
+           * no range checking, no trim, tracking enabled.
+           */
+          memset(req, 0, ELO_PACKET_SIZE);
+          req[1] = ELO_MODE;
+          req[3] = ELO_TOUCH_MODE | ELO_STREAM_MODE | ELO_UNTOUCH_MODE;
+          req[4] = ELO_TRACKING_MODE;
+          if (xf86EloSendControl(req, local->fd) != Success) {
+              ErrorF("Unable to change Elographics touchscreen operating mode\n");
+              goto not_success;
+          }
 
-      not_success:
-	SYSCALL(close(local->fd));
-	local->fd = -1;
-	return !Success;
+          /*
+           * Set the touch reports timings from configuration data.
+           */
+          memset(req, 0, ELO_PACKET_SIZE);
+          req[1] = ELO_REPORT;
+          req[2] = priv->untouch_delay;
+          req[3] = priv->report_delay;
+          if (xf86EloSendControl(req, local->fd) != Success) {
+              ErrorF("Unable to change Elographics touchscreen reports timings\n");
+
+not_success:
+              SYSCALL(close(local->fd));
+              local->fd = -1;
+              return !Success;
+          }
       }
       xf86AddEnabledDevice(local);
       dev->public.on = TRUE;

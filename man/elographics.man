@@ -73,7 +73,7 @@ event to occur. Default: 5 (50ms).
 Delay between report packets. Default: 1 (10ms).
 .TP
 .BI "Option \*qModel\*q \*q" string \*q
-The touchscreen model. Default: unset.
+The touchscreen model. Default: unset. Supported models: "Sunit dSeries".
 .SH "SEE ALSO"
 __xservername__(__appmansuffix__), __xconfigfile__(__filemansuffix__), xorgconfig(__appmansuffix__), Xserver(__appmansuffix__), X(__miscmansuffix__).
 .SH AUTHORS
