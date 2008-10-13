@@ -65,6 +65,20 @@
 #include "xf86Module.h"
 #endif
 
+/**
+ * models to be treated specially.
+ */
+#define MODEL_UNKNOWN  -1
+
+typedef struct {
+    int         type;
+    char        *name;
+} Model;
+
+static Model SupportedModels[] =
+{
+    {MODEL_UNKNOWN, NULL}
+};
 /*
  ***************************************************************************
  *
@@ -186,6 +200,7 @@ typedef struct _EloPrivateRec {
   int		packet_buf_p;		/* Assembly buffer pointer			*/
   int		swap_axes;		/* Swap X an Y axes if != 0 */
   unsigned char	packet_buf[ELO_PACKET_SIZE]; /* Assembly buffer				*/
+  int		model;			/* one of MODEL_...				*/
 } EloPrivateRec, *EloPrivatePtr;
 
 /*
@@ -1039,6 +1054,9 @@ xf86EloInit(InputDriverPtr	drv,
   char			*str;
   int			portrait = 0;
   int			height, width;
+  char			*opt_model;
+  Model*		model;
+
 
   local = xf86EloAllocate(drv);
   if (!local) {
@@ -1064,6 +1082,19 @@ xf86EloInit(InputDriverPtr	drv,
     return local;
   }
   priv->input_dev = strdup(str);
+
+  opt_model = xf86SetStrOption(local->options, "Model", NULL);
+  model = SupportedModels;
+  priv->model = MODEL_UNKNOWN;
+  while(model->type != MODEL_UNKNOWN && opt_model)
+  {
+      if (!strcmp(model->name, opt_model))
+      {
+          priv->model = model->type;
+          break;
+      }
+      model++;
+  }
 
   local->name = xf86SetStrOption(local->options, "DeviceName", XI_TOUCHSCREEN);
   xf86Msg(X_CONFIG, "Elographics X device name: %s\n", local->name);
