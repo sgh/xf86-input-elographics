@@ -18,3 +18,6 @@ ltmain.sh
 missing
 stamp-h1
 *~
+xf86-input-elographics-*.tar.*
+ChangeLog
+tags
