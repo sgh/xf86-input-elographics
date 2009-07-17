@@ -780,6 +780,10 @@ xf86EloControl(DeviceIntPtr	dev,
   unsigned char		map[] = { 0, 1 };
   unsigned char		req[ELO_PACKET_SIZE];
   unsigned char		reply[ELO_PACKET_SIZE];
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
+  Atom btn_label;
+  Atom axis_labels[2] = { 0, 0 };
+#endif
 
   switch(mode) {
 
@@ -797,7 +801,11 @@ xf86EloControl(DeviceIntPtr	dev,
       /*
        * Device reports button press for up to 1 button.
        */
-      if (InitButtonClassDeviceStruct(dev, 1, map) == FALSE) {
+      if (InitButtonClassDeviceStruct(dev, 1,
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
+				      &btn_label,
+#endif
+				      map) == FALSE) {
 	ErrorF("Unable to allocate Elographics touchscreen ButtonClassDeviceStruct\n");
 	return !Success;
       }
@@ -818,6 +826,9 @@ xf86EloControl(DeviceIntPtr	dev,
        * screen to fit one meter.
        */
       if (InitValuatorClassDeviceStruct(dev, 2,
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
+					axis_labels,
+#endif
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) < 3
                   xf86GetMotionEvents,
 #endif
@@ -827,11 +838,19 @@ xf86EloControl(DeviceIntPtr	dev,
       }
       else {
 	/* I will map coordinates myself */
-	InitValuatorAxisStruct(dev, 0, -1, -1,
+	InitValuatorAxisStruct(dev, 0,
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
+			       axis_labels[0],
+#endif
+			       -1, -1,
 			       9500,
 			       0     /* min_res */,
 			       9500  /* max_res */);
-	InitValuatorAxisStruct(dev, 1, -1, -1,
+	InitValuatorAxisStruct(dev, 1,
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
+			       axis_labels[1],
+#endif
+			       -1, -1,
 			       10500,
 			       0     /* min_res */,
 			       10500 /* max_res */);
