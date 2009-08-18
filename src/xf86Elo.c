@@ -1050,7 +1050,7 @@ xf86EloUninit(InputDriverPtr	drv,
 
   xfree(priv->input_dev);
   xfree(priv);
-
+  local->private = NULL;
   xf86DeleteInput(local, 0);
 }
 
