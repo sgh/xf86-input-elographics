@@ -421,15 +421,17 @@ xf86EloReadInput(LocalDevicePtr	local)
 #endif
 
   DBG(4, ErrorF("Entering ReadInput\n"));
+
   /*
-   * Try to get a packet.
+   * Read bytes until there's no data left. We may have more or less than
+   * one packet worth of data in the OS buffer.
    */
-  while (xf86WaitForInput(local->fd, ELO_MAX_WAIT/100) > 0) {
+  do {
       if(xf86EloGetPacket(priv->packet_buf,
 		       &priv->packet_buf_p,
 		       &priv->checksum,
 		       local->fd) != Success)
-          break;
+          continue;
 
       /*
        * Process only ELO_TOUCHs here.
@@ -488,6 +490,7 @@ xf86EloReadInput(LocalDevicePtr	local)
                       (state == ELO_PRESS) ? "Press" : ((state == ELO_RELEASE) ? "Release" : "Stream")));
       }
   }
+  while (xf86WaitForInput(local->fd, 0) > 0);  /* don't wait, just check */
 }
 
 
@@ -1059,8 +1062,6 @@ static const char *default_options[] = {
   "StopBits", "1",
   "DataBits", "8",
   "Parity", "None",
-  "Vmin", "10",
-  "Vtime", "1",
   "FlowControl", "None",
   NULL
 };
