@@ -907,8 +907,7 @@ xf86EloControl(DeviceIntPtr	dev,
               xf86EloPrintIdent(reply, priv);
           }
           else {
-              ErrorF("Unable to ask Elographics touchscreen identification\n");
-              goto not_success;
+              DBG(2, ErrorF("Unable to ask Elographics touchscreen identification... Maybe it's GeneralTouch touchscreen...\n"));
           }
 
           /*
@@ -920,8 +919,7 @@ xf86EloControl(DeviceIntPtr	dev,
           req[3] = ELO_TOUCH_MODE | ELO_STREAM_MODE | ELO_UNTOUCH_MODE;
           req[4] = ELO_TRACKING_MODE;
           if (xf86EloSendControl(req, local->fd) != Success) {
-              ErrorF("Unable to change Elographics touchscreen operating mode\n");
-              goto not_success;
+              DBG(2, ErrorF("Unable to change Elographics touchscreen operating mode... Maybe it's GeneralTouch touchscreen...\n"));
           }
 
           /*
@@ -932,12 +930,7 @@ xf86EloControl(DeviceIntPtr	dev,
           req[2] = priv->untouch_delay;
           req[3] = priv->report_delay;
           if (xf86EloSendControl(req, local->fd) != Success) {
-              ErrorF("Unable to change Elographics touchscreen reports timings\n");
-
-not_success:
-              SYSCALL(close(local->fd));
-              local->fd = -1;
-              return !Success;
+              DBG(2, ErrorF("Unable to change Elographics touchscreen reports timings... Maybe it's GeneralTouch touchscreen...\n"));
           }
       }
       xf86AddEnabledDevice(local);
