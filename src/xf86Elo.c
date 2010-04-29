@@ -61,6 +61,11 @@
 #include "xf86Xinput.h"
 #include "exevents.h"
 
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>
+#include <unistd.h>
+
 #ifdef XFree86LOADER
 #include "xf86Module.h"
 #endif
@@ -101,7 +106,6 @@ static Model SupportedModels[] =
 #define DEFAULT_MAX_Y		3000
 #define DEFAULT_MIN_Y		600
 
-
 /*
  ***************************************************************************
  *
@@ -141,6 +145,8 @@ static Model SupportedModels[] =
 
 #define ELO_SERIAL_IO		'0'	/* Indicator byte for PARAMETER command */
 
+#define SHM_ELOGRAPHICS_NAME "/ELOGRAPHICS_CAL"
+#define ELOSHM_VERSION       363799130
 
 /*
  ***************************************************************************
@@ -177,7 +183,6 @@ static int      debug_level = 0;
 #define write(fd, ptr, num) xf86WriteSerial(fd, ptr, num)
 #define close(fd) xf86CloseSerial(fd)
 
-
 /*
  ***************************************************************************
  *
@@ -185,14 +190,22 @@ static int      debug_level = 0;
  *
  ***************************************************************************
  */
+typedef struct _EloShmRec {
+  int		version;          /* Magic. To ensure match with calibration software */
+  int		cur_x;            /* Last raw X-coordinate                     */
+  int		cur_y;            /* Last raw Y-coordinate                     */
+  int		min_x;            /* Minimum x reported by calibration         */
+  int		max_x;            /* Maximum x                                 */
+  int		min_y;            /* Minimum y reported by calibration         */
+  int		max_y;            /* Maximum y                                 */
+  int		swap_axes;        /* Swap X an Y axes if != 0                  */
+  int		untouch_delay;    /* Delay before reporting an untouch (in ms) */
+  int		report_delay;     /* Delay between touch report packets        */
+}  EloShmRec, *EloShmPtr;
+
 typedef struct _EloPrivateRec {
   char		*input_dev;		/* The touchscreen input tty			*/
-  int		min_x;			/* Minimum x reported by calibration		*/
-  int		max_x;			/* Maximum x					*/
-  int		min_y;			/* Minimum y reported by calibration		*/
-  int		max_y;			/* Maximum y					*/
-  int		untouch_delay;		/* Delay before reporting an untouch (in ms)    */
-  int		report_delay;		/* Delay between touch report packets		*/
+  EloShmPtr	eloshm;			/* Shared memory, or xalloced memory */
   int		screen_no;		/* Screen associated with the device		*/
   int		screen_width;		/* Width of the associated X screen		*/
   int		screen_height;		/* Height of the screen				*/
@@ -200,9 +213,9 @@ typedef struct _EloPrivateRec {
   Bool		is_a_2310;		/* Set if the smartset is a 2310.		*/
   int		checksum;		/* Current checksum of data in assembly buffer	*/
   int		packet_buf_p;		/* Assembly buffer pointer			*/
-  int		swap_axes;		/* Swap X an Y axes if != 0 */
   unsigned char	packet_buf[ELO_PACKET_SIZE]; /* Assembly buffer				*/
   int		model;			/* one of MODEL_...				*/
+  int   SHMConfig;			/* If !=0 Shared memory is on */
 } EloPrivateRec, *EloPrivatePtr;
 
 /*
@@ -334,8 +347,8 @@ xf86EloConvert(LocalDevicePtr	local,
 	       int		*y)
 {
   EloPrivatePtr	priv = (EloPrivatePtr) local->private;
-  int		width = priv->max_x - priv->min_x;
-  int		height = priv->max_y - priv->min_y;
+  int		width = priv->eloshm->max_x - priv->eloshm->min_x;
+  int		height = priv->eloshm->max_y - priv->eloshm->min_y;
   int		input_x, input_y;
 
   if (first != 0 || num != 2) {
@@ -347,7 +360,7 @@ xf86EloConvert(LocalDevicePtr	local,
   if (width == 0) width = 1;
   if (height == 0) height = 1;
 
-  if (priv->swap_axes) {
+  if (priv->eloshm->swap_axes) {
     input_x = v1;
     input_y = v0;
   }
@@ -355,9 +368,9 @@ xf86EloConvert(LocalDevicePtr	local,
     input_x = v0;
     input_y = v1;
   }
-  *x = (priv->screen_width * (input_x - priv->min_x)) / width;
+  *x = (priv->screen_width * (input_x - priv->eloshm->min_x)) / width;
   *y = (priv->screen_height -
-	(priv->screen_height * (input_y - priv->min_y)) / height);
+	(priv->screen_height * (input_y - priv->eloshm->min_y)) / height);
 
   /*
    * MHALAS: Based on the description in xf86XInputSetScreen
@@ -443,6 +456,8 @@ xf86EloReadInput(LocalDevicePtr	local)
           cur_x = WORD_ASSEMBLY(priv->packet_buf[3], priv->packet_buf[4]);
           cur_y = WORD_ASSEMBLY(priv->packet_buf[5], priv->packet_buf[6]);
           state = priv->packet_buf[2] & 0x07;
+          priv->eloshm->cur_x = cur_x;
+          priv->eloshm->cur_y = cur_y;
 #if GET_ABI_MAJOR(XINPUT_ABI) == 0
           /*
            * MHALAS: Based on the description in xf86XInputSetScreen
@@ -927,8 +942,8 @@ xf86EloControl(DeviceIntPtr	dev,
            */
           memset(req, 0, ELO_PACKET_SIZE);
           req[1] = ELO_REPORT;
-          req[2] = priv->untouch_delay;
-          req[3] = priv->report_delay;
+          req[2] = priv->eloshm->untouch_delay;
+          req[3] = priv->eloshm->report_delay;
           if (xf86EloSendControl(req, local->fd) != Success) {
               DBG(2, ErrorF("Unable to change Elographics touchscreen reports timings... Maybe it's GeneralTouch touchscreen...\n"));
           }
@@ -1001,13 +1016,43 @@ xf86EloAllocate(InputDriverPtr	drv, IDevPtr dev)
     return NULL;
   }
 
+  priv->SHMConfig = 1; // TODO: Make it configurable via Option "SHMConfig"
+
+  if (priv->SHMConfig)
+    xf86Msg(X_CONFIG, "Elographics: SHMConfig on\n");
+
+  if (priv->SHMConfig) {
+    int fd = shm_open(SHM_ELOGRAPHICS_NAME, O_CREAT|O_RDWR, S_IRWXU|S_IRWXG);
+    if (fd<0) {
+      xf86Msg(X_ERROR, "Elographics: Failed to create shared memory\n");
+      return NULL;
+    }
+
+    if (ftruncate(fd, sizeof(EloShmRec)) != 0) {
+			xf86Msg(X_ERROR, "Elographics: Failed to truncate memory region\n");
+			shm_unlink(SHM_ELOGRAPHICS_NAME);
+			return NULL;
+		}
+
+    if ( (priv->eloshm = mmap(NULL, sizeof(EloShmRec), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0)) < 0 ) {
+      xf86Msg(X_ERROR, "Elographics: Failed to map memory\n");
+			shm_unlink(SHM_ELOGRAPHICS_NAME);
+      return NULL;
+    }
+  } else {
+    priv->eloshm = xalloc(sizeof(EloShmRec));
+    if (!priv->eloshm)
+      return NULL;
+  }
+
   priv->input_dev = strdup(ELO_PORT);
-  priv->min_x = 0;
-  priv->max_x = 3000;
-  priv->min_y = 0;
-  priv->max_y = 3000;
-  priv->untouch_delay = ELO_UNTOUCH_DELAY;
-  priv->report_delay = ELO_REPORT_DELAY;
+  priv->eloshm->version = ELOSHM_VERSION;
+  priv->eloshm->min_x = 0;
+  priv->eloshm->max_x = 3000;
+  priv->eloshm->min_y = 0;
+  priv->eloshm->max_y = 3000;
+  priv->eloshm->untouch_delay = ELO_UNTOUCH_DELAY;
+  priv->eloshm->report_delay = ELO_REPORT_DELAY;
   priv->screen_no = 0;
   priv->screen_width = -1;
   priv->screen_height = -1;
@@ -1015,7 +1060,7 @@ xf86EloAllocate(InputDriverPtr	drv, IDevPtr dev)
   priv->is_a_2310 = 0;
   priv->checksum = ELO_INIT_CHECKSUM;
   priv->packet_buf_p = 0;
-  priv->swap_axes = 0;
+  priv->eloshm->swap_axes = 0;
 
   local->name = xstrdup(dev->identifier);
   local->flags = 0 /* XI86_NO_OPEN_ON_INIT */;
@@ -1045,6 +1090,11 @@ xf86EloUninit(InputDriverPtr	drv,
   EloPrivatePtr		priv = (EloPrivatePtr) local->private;
 
   xfree(priv->input_dev);
+  if (priv->SHMConfig) {
+    munmap(priv->eloshm, sizeof(EloShmRec));
+    shm_unlink(SHM_ELOGRAPHICS_NAME);
+  } else
+    xfree(priv->eloshm);
   xfree(priv);
   local->private = NULL;
   xf86DeleteInput(local, 0);
@@ -1092,6 +1142,11 @@ xf86EloInit(InputDriverPtr	drv,
       if (priv->input_dev) {
 	xfree(priv->input_dev);
       }
+      if (priv->SHMConfig) {
+        munmap(priv->eloshm, sizeof(EloShmRec));
+        shm_unlink(SHM_ELOGRAPHICS_NAME);
+      } else
+        xfree(priv->eloshm);
       xfree(priv);
     }
     return local;
@@ -1110,25 +1165,24 @@ xf86EloInit(InputDriverPtr	drv,
       }
       model++;
   }
-
   local->name = xf86SetStrOption(local->options, "DeviceName", XI_TOUCHSCREEN);
   xf86Msg(X_CONFIG, "Elographics X device name: %s\n", local->name);
   priv->screen_no = xf86SetIntOption(local->options, "ScreenNo", 0);
   xf86Msg(X_CONFIG, "Elographics associated screen: %d\n", priv->screen_no);
-  priv->untouch_delay = xf86SetIntOption(local->options, "UntouchDelay", ELO_UNTOUCH_DELAY);
-  xf86Msg(X_CONFIG, "Elographics untouch delay: %d ms\n", priv->untouch_delay*10);
-  priv->report_delay = xf86SetIntOption(local->options, "ReportDelay", ELO_REPORT_DELAY);
-  xf86Msg(X_CONFIG, "Elographics report delay: %d ms\n", priv->report_delay*10);
-  priv->max_x = xf86SetIntOption(local->options, "MaxX", 3000);
-  xf86Msg(X_CONFIG, "Elographics maximum x position: %d\n", priv->max_x);
-  priv->min_x = xf86SetIntOption(local->options, "MinX", 0);
-  xf86Msg(X_CONFIG, "Elographics minimum x position: %d\n", priv->min_x);
-  priv->max_y = xf86SetIntOption(local->options, "MaxY", 3000);
-  xf86Msg(X_CONFIG, "Elographics maximum y position: %d\n", priv->max_y);
-  priv->min_y = xf86SetIntOption(local->options, "MinY", 0);
-  xf86Msg(X_CONFIG, "Elographics minimum y position: %d\n", priv->min_y);
-  priv->swap_axes = xf86SetBoolOption(local->options, "SwapXY", 0);
-  if (priv->swap_axes) {
+  priv->eloshm->untouch_delay = xf86SetIntOption(local->options, "UntouchDelay", ELO_UNTOUCH_DELAY);
+  xf86Msg(X_CONFIG, "Elographics untouch delay: %d ms\n", priv->eloshm->untouch_delay*10);
+  priv->eloshm->report_delay = xf86SetIntOption(local->options, "ReportDelay", ELO_REPORT_DELAY);
+  xf86Msg(X_CONFIG, "Elographics report delay: %d ms\n", priv->eloshm->report_delay*10);
+  priv->eloshm->max_x = xf86SetIntOption(local->options, "MaxX", 3000);
+  xf86Msg(X_CONFIG, "Elographics maximum x position: %d\n", priv->eloshm->max_x);
+  priv->eloshm->min_x = xf86SetIntOption(local->options, "MinX", 0);
+  xf86Msg(X_CONFIG, "Elographics minimum x position: %d\n", priv->eloshm->min_x);
+  priv->eloshm->max_y = xf86SetIntOption(local->options, "MaxY", 3000);
+  xf86Msg(X_CONFIG, "Elographics maximum y position: %d\n", priv->eloshm->max_y);
+  priv->eloshm->min_y = xf86SetIntOption(local->options, "MinY", 0);
+  xf86Msg(X_CONFIG, "Elographics minimum y position: %d\n", priv->eloshm->min_y);
+  priv->eloshm->swap_axes = xf86SetBoolOption(local->options, "SwapXY", 0);
+  if (priv->eloshm->swap_axes) {
     xf86Msg(X_CONFIG, "Elographics device will work with X and Y axes swapped\n");
   }
   debug_level = xf86SetIntOption(local->options, "DebugLevel", 0);
@@ -1152,8 +1206,8 @@ xf86EloInit(InputDriverPtr	drv,
   }
   xf86Msg(X_CONFIG, "Elographics device will work in %s mode\n", str);
 
-  width = priv->max_x - priv->min_x;
-  height = priv->max_y - priv->min_y;
+  width = priv->eloshm->max_x - priv->eloshm->min_x;
+  height = priv->eloshm->max_y - priv->eloshm->min_y;
   if (width == 0) {
     xf86Msg(X_ERROR, "Elographics: Cannot configure touchscreen with width 0\n");
     return local;
@@ -1174,20 +1228,20 @@ xf86EloInit(InputDriverPtr	drv,
      * Portrait Clockwise: reverse Y axis and exchange X and Y.
      */
     int tmp;
-    tmp = priv->min_y;
-    priv->min_y = priv->max_y;
-    priv->max_y = tmp;
-    priv->swap_axes = (priv->swap_axes==0) ? 1 : 0;
+    tmp = priv->eloshm->min_y;
+    priv->eloshm->min_y = priv->eloshm->max_y;
+    priv->eloshm->max_y = tmp;
+    priv->eloshm->swap_axes = (priv->eloshm->swap_axes==0) ? 1 : 0;
   }
   else if (portrait == -1) {
     /*
      * Portrait Counter Clockwise: reverse X axis and exchange X and Y.
      */
     int tmp;
-    tmp = priv->min_x;
-    priv->min_x = priv->max_x;
-    priv->max_x = tmp;
-    priv->swap_axes = (priv->swap_axes==0) ? 1 : 0;
+    tmp = priv->eloshm->min_x;
+    priv->eloshm->min_x = priv->eloshm->max_x;
+    priv->eloshm->max_x = tmp;
+    priv->eloshm->swap_axes = (priv->eloshm->swap_axes==0) ? 1 : 0;
   }
 
   /* mark the device configured */
