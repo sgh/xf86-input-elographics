@@ -1,0 +1,3 @@
+all:
+	$(CXX) $(CXXFLAGS) -o calibrate_xf86elo calibrate_xf86elo.cpp -l QtGui -I /usr/include/qt4/ -lrt
+
