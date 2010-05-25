@@ -255,11 +255,6 @@ public:
 		}
 	}
 
-
-	~EloCalibrationWidget() {
-		munmap(priv, sizeof(EloShmRec));
-		shm_unlink(SHM_ELOGRAPHICS_NAME);
-	}
 };
 
 int main(int argc, char* argv[]) {
