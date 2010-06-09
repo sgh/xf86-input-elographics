@@ -990,14 +990,14 @@ xf86EloAllocate(InputDriverPtr	drv, IDevPtr dev)
   LocalDevicePtr	local;
   EloPrivatePtr		priv;
 
-  priv = xalloc(sizeof(EloPrivateRec));
+  priv = malloc(sizeof(EloPrivateRec));
   if (!priv)
     return NULL;
 
   local = xf86AllocateInput(drv, 0);
 
   if (!local) {
-    xfree(priv);
+    free(priv);
     return NULL;
   }
 
@@ -1044,8 +1044,8 @@ xf86EloUninit(InputDriverPtr	drv,
 {
   EloPrivatePtr		priv = (EloPrivatePtr) local->private;
 
-  xfree(priv->input_dev);
-  xfree(priv);
+  free(priv->input_dev);
+  free(priv);
   local->private = NULL;
   xf86DeleteInput(local, 0);
 }
@@ -1090,9 +1090,9 @@ xf86EloInit(InputDriverPtr	drv,
 	    dev->identifier);
     if (priv) {
       if (priv->input_dev) {
-	xfree(priv->input_dev);
+	free(priv->input_dev);
       }
-      xfree(priv);
+      free(priv);
     }
     return local;
   }
