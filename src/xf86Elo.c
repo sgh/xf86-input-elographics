@@ -781,7 +781,7 @@ xf86EloControl(DeviceIntPtr	dev,
        * screen to fit one meter.
        */
       if (InitValuatorClassDeviceStruct(dev, 2, axis_labels,
-					pInfo->history_size, Absolute) == FALSE) {
+					GetMotionHistorySize(), Absolute) == FALSE) {
 	ErrorF("Unable to allocate Elographics touchscreen ValuatorClassDeviceStruct\n");
 	return !Success;
       }
@@ -973,7 +973,6 @@ xf86EloAllocate(InputDriverPtr	drv, IDevPtr dev)
   pInfo->dev	      = NULL;
   pInfo->private      = priv;
   pInfo->type_name    = "Elographics TouchScreen";
-  pInfo->history_size = 0;
 
   return pInfo;
 }
