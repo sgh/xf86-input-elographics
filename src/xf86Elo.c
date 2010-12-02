@@ -50,20 +50,13 @@
 #include "xorgVersion.h"
 
 
-#ifndef XFree86LOADER
-#include <unistd.h>
-#include <errno.h>
-#endif
-
 #include "misc.h"
 #include "xf86.h"
 #include "xf86_OSproc.h"
 #include "xf86Xinput.h"
 #include "exevents.h"
 
-#ifdef XFree86LOADER
 #include "xf86Module.h"
-#endif
 
 /**
  * models to be treated specially.
@@ -1205,7 +1198,6 @@ _X_EXPORT InputDriverRec ELOGRAPHICS = {
     0				/* ref count */
 };
 
-#ifdef XFree86LOADER
 static pointer
 Plug(pointer	module,
      pointer	options,
@@ -1243,4 +1235,3 @@ static XF86ModuleVersionInfo version_rec = {
  */
 _X_EXPORT XF86ModuleData elographicsModuleData = { &version_rec, Plug, Unplug };
 
-#endif
