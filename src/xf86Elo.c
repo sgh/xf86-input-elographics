@@ -1073,7 +1073,6 @@ _X_EXPORT InputDriverRec ELOGRAPHICS = {
     xf86EloInit,		/* pre-init */
     xf86EloUninit,		/* un-init */
     NULL,			/* module */
-    0				/* ref count */
 };
 
 static pointer
