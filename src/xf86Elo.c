@@ -58,6 +58,10 @@
 
 #include "xf86Module.h"
 
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) < 12
+#error "Need server with input ABI 12."
+#endif
+
 /**
  * models to be treated specially.
  */
@@ -725,13 +729,15 @@ xf86EloControl(DeviceIntPtr	dev,
 			       -1, -1,
 			       9500,
 			       0     /* min_res */,
-			       9500  /* max_res */);
+			       9500  /* max_res */,
+			       Absolute);
 	InitValuatorAxisStruct(dev, 1,
 			       axis_labels[1],
 			       -1, -1,
 			       10500,
 			       0     /* min_res */,
-			       10500 /* max_res */);
+			       10500 /* max_res */,
+			       Absolute);
       }
 
       if (InitFocusClassDeviceStruct(dev) == FALSE) {
@@ -859,22 +865,14 @@ xf86EloControl(DeviceIntPtr	dev,
  *
  ***************************************************************************
  */
-static InputInfoPtr
-xf86EloAllocate(InputDriverPtr	drv, IDevPtr dev)
+static int
+xf86EloAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
 {
-  InputInfoPtr	pInfo;
   EloPrivatePtr		priv;
 
   priv = malloc(sizeof(EloPrivateRec));
   if (!priv)
-    return NULL;
-
-  pInfo = xf86AllocateInput(drv, 0);
-
-  if (!pInfo) {
-    free(priv);
-    return NULL;
-  }
+    return BadAlloc;
 
   priv->input_dev = strdup(ELO_PORT);
   priv->min_x = 0;
@@ -892,19 +890,15 @@ xf86EloAllocate(InputDriverPtr	drv, IDevPtr dev)
   priv->packet_buf_p = 0;
   priv->swap_axes = 0;
 
-  pInfo->name = xstrdup(dev->identifier);
   pInfo->flags = 0 /* XI86_NO_OPEN_ON_INIT */;
   pInfo->device_control = xf86EloControl;
   pInfo->read_input   = xf86EloReadInput;
   pInfo->control_proc = NULL;
   pInfo->switch_mode  = NULL;
-  pInfo->fd	      = -1;
-  pInfo->atom	      = 0;
-  pInfo->dev	      = NULL;
   pInfo->private      = priv;
   pInfo->type_name    = "Elographics TouchScreen";
 
-  return pInfo;
+  return Success;
 }
 
 
@@ -921,7 +915,7 @@ xf86EloUninit(InputDriverPtr	drv,
   xf86DeleteInput(pInfo, 0);
 }
 
-static const char *default_options[] = {
+static char *default_options[] = {
   "BaudRate", "9600",
   "StopBits", "1",
   "DataBits", "8",
@@ -930,42 +924,37 @@ static const char *default_options[] = {
   NULL
 };
 
-static InputInfoPtr
+static int
 xf86EloInit(InputDriverPtr	drv,
-	    IDevPtr		dev,
+	    InputInfoPtr	pInfo,
 	    int			flags)
 {
-  InputInfoPtr	pInfo=NULL;
   EloPrivatePtr		priv=NULL;
   char			*str;
   int			portrait = 0;
   int			height, width;
   char			*opt_model;
   Model*		model;
+  int			rc;
 
 
-  pInfo = xf86EloAllocate(drv, dev);
-  if (!pInfo) {
-    return NULL;
-  }
+  rc = xf86EloAllocate(drv, pInfo);
+  if (rc != Success)
+    return rc;
+
   priv = pInfo->private;
-  pInfo->conf_idev = dev;
-
-  xf86CollectInputOptions(pInfo, default_options, NULL);
-  /* Process the common options. */
-  xf86ProcessCommonOptions(pInfo, pInfo->options);
 
   str = xf86FindOptionValue(pInfo->options, "Device");
   if (!str) {
     xf86Msg(X_ERROR, "%s: No Device specified in Elographics module config.\n",
-	    dev->identifier);
+	    pInfo->name);
     if (priv) {
       if (priv->input_dev) {
 	free(priv->input_dev);
       }
       free(priv);
     }
-    return pInfo;
+    return BadValue;
   }
   priv->input_dev = strdup(str);
 
@@ -1027,14 +1016,14 @@ xf86EloInit(InputDriverPtr	drv,
   height = priv->max_y - priv->min_y;
   if (width == 0) {
     xf86Msg(X_ERROR, "Elographics: Cannot configure touchscreen with width 0\n");
-    return pInfo;
+    return BadValue;
   }
   else if (width < 0) {
     xf86Msg(X_INFO, "Elographics: reverse x mode (minimum x position >= maximum x position)\n");
   }
   if (height == 0) {
     xf86Msg(X_ERROR, "Elographics: Cannot configure touchscreen with height 0\n");
-    return pInfo;
+    return BadValue;
   }
   else if (height < 0) {
     xf86Msg(X_INFO, "Elographics: reverse y mode (minimum y position >= maximum y position)\n");
@@ -1061,9 +1050,7 @@ xf86EloInit(InputDriverPtr	drv,
     priv->swap_axes = (priv->swap_axes==0) ? 1 : 0;
   }
 
-  /* mark the device configured */
-  pInfo->flags |= XI86_CONFIGURED;
-  return pInfo;
+  return Success;
 }
 
 _X_EXPORT InputDriverRec ELOGRAPHICS = {
@@ -1073,6 +1060,7 @@ _X_EXPORT InputDriverRec ELOGRAPHICS = {
     xf86EloInit,		/* pre-init */
     xf86EloUninit,		/* un-init */
     NULL,			/* module */
+    default_options
 };
 
 static pointer
