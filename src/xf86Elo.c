@@ -402,16 +402,6 @@ xf86EloReadInput(InputInfoPtr	pInfo)
   EloPrivatePtr			priv = (EloPrivatePtr)(pInfo->private);
   int				cur_x, cur_y;
   int				state;
-#if GET_ABI_MAJOR(XINPUT_ABI) == 0
-   int first = 0; /* since convert is expecting 0 */
-   int num = 2; /* since convert is expecting 0 */
-   int v0 = 0; /* = cur_x - based on the debug output this is what v0 is */
-   int v1 = 0; /* = cur_y based on the debug output this is what v0 is */
-   int v2 = 0; /* not used in convert */
-   int v3 = 0; /* not used in convert */
-   int v4 = 0; /* not used in convert */
-   int v5 = 0; /* not used in convert */
-#endif
 
   DBG(4, ErrorF("Entering ReadInput\n"));
 
@@ -436,31 +426,6 @@ xf86EloReadInput(InputInfoPtr	pInfo)
           cur_x = WORD_ASSEMBLY(priv->packet_buf[3], priv->packet_buf[4]);
           cur_y = WORD_ASSEMBLY(priv->packet_buf[5], priv->packet_buf[6]);
           state = priv->packet_buf[2] & 0x07;
-#if GET_ABI_MAJOR(XINPUT_ABI) == 0
-          /*
-           * MHALAS: Based on the description in xf86XInputSetScreen
-           * this code must be called from ReadInput BEFORE any events
-           * are posted but this method is called FROM xf86PostMotionEvent
-           * Therefore I have moved this method into xf86EloReadInput
-           */
-          /*
-           * Need to check if still on the correct screen.
-           * This call is here so that this work can be done after
-           * calib and before posting the event.
-           */
-
-          DBG(3, ErrorF("EloConvert Before Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, cur_x, cur_y));
-          v0 = cur_x; /* based on the debug output this is what v0 is */
-          v1 = cur_y; /* based on the debug output this is what v1 is */
-          /*
-           * Use the conversion method to send correct coordinates
-           * since it contains all necessary logic
-           */
-          xf86EloConvert(pInfo, first, num, v0, v1, v2, v3, v4, v5, &cur_x, &cur_y);
-          DBG(3, ErrorF("EloConvert During Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, cur_x, cur_y));
-          xf86XInputSetScreen(pInfo, priv->screen_no, cur_x, cur_y);
-          DBG(3, ErrorF("EloConvert After Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, cur_x, cur_y));
-#endif
 
           /*
            * Send events.
@@ -776,10 +741,8 @@ xf86EloControl(DeviceIntPtr	dev,
   unsigned char		map[] = { 0, 1 };
   unsigned char		req[ELO_PACKET_SIZE];
   unsigned char		reply[ELO_PACKET_SIZE];
-#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
   Atom btn_label;
   Atom axis_labels[2] = { 0, 0 };
-#endif
 
   switch(mode) {
 
@@ -797,11 +760,7 @@ xf86EloControl(DeviceIntPtr	dev,
       /*
        * Device reports button press for up to 1 button.
        */
-      if (InitButtonClassDeviceStruct(dev, 1,
-#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
-				      &btn_label,
-#endif
-				      map) == FALSE) {
+      if (InitButtonClassDeviceStruct(dev, 1, &btn_label, map) == FALSE) {
 	ErrorF("Unable to allocate Elographics touchscreen ButtonClassDeviceStruct\n");
 	return !Success;
       }
@@ -821,13 +780,7 @@ xf86EloControl(DeviceIntPtr	dev,
        * max and min values scaled from the approximate size of the
        * screen to fit one meter.
        */
-      if (InitValuatorClassDeviceStruct(dev, 2,
-#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
-					axis_labels,
-#endif
-#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) < 3
-                  xf86GetMotionEvents,
-#endif
+      if (InitValuatorClassDeviceStruct(dev, 2, axis_labels,
 					pInfo->history_size, Absolute) == FALSE) {
 	ErrorF("Unable to allocate Elographics touchscreen ValuatorClassDeviceStruct\n");
 	return !Success;
@@ -835,17 +788,13 @@ xf86EloControl(DeviceIntPtr	dev,
       else {
 	/* I will map coordinates myself */
 	InitValuatorAxisStruct(dev, 0,
-#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
 			       axis_labels[0],
-#endif
 			       -1, -1,
 			       9500,
 			       0     /* min_res */,
 			       9500  /* max_res */);
 	InitValuatorAxisStruct(dev, 1,
-#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
 			       axis_labels[1],
-#endif
 			       -1, -1,
 			       10500,
 			       0     /* min_res */,
