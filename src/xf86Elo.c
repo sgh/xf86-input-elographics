@@ -314,7 +314,7 @@ xf86EloGetPacket(unsigned char	*buffer,
  ***************************************************************************
  */
 static Bool
-xf86EloConvert(LocalDevicePtr	local,
+xf86EloConvert(InputInfoPtr	pInfo,
 	       int		first,
 	       int		num,
 	       int		v0,
@@ -326,7 +326,7 @@ xf86EloConvert(LocalDevicePtr	local,
 	       int		*x,
 	       int		*y)
 {
-  EloPrivatePtr	priv = (EloPrivatePtr) local->private;
+  EloPrivatePtr	priv = (EloPrivatePtr) pInfo->private;
   int		width = priv->max_x - priv->min_x;
   int		height = priv->max_y - priv->min_y;
   int		input_x, input_y;
@@ -363,7 +363,7 @@ xf86EloConvert(LocalDevicePtr	local,
    * This call is here so that this work can be done after
    * calib and before posting the event.
    */
-/*  xf86XInputSetScreen(local, priv->screen_no, *x, *y); */
+/*  xf86XInputSetScreen(pInfo, priv->screen_no, *x, *y); */
 
   DBG(3, ErrorF("EloConvert: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, *x, *y));
 
@@ -397,9 +397,9 @@ xf86EloConvert(LocalDevicePtr	local,
  ***************************************************************************
  */
 static void
-xf86EloReadInput(LocalDevicePtr	local)
+xf86EloReadInput(InputInfoPtr	pInfo)
 {
-  EloPrivatePtr			priv = (EloPrivatePtr)(local->private);
+  EloPrivatePtr			priv = (EloPrivatePtr)(pInfo->private);
   int				cur_x, cur_y;
   int				state;
 #if GET_ABI_MAJOR(XINPUT_ABI) == 0
@@ -423,7 +423,7 @@ xf86EloReadInput(LocalDevicePtr	local)
       if(xf86EloGetPacket(priv->packet_buf,
 		       &priv->packet_buf_p,
 		       &priv->checksum,
-		       local->fd) != Success)
+		       pInfo->fd) != Success)
           continue;
 
       /*
@@ -456,9 +456,9 @@ xf86EloReadInput(LocalDevicePtr	local)
            * Use the conversion method to send correct coordinates
            * since it contains all necessary logic
            */
-          xf86EloConvert(local, first, num, v0, v1, v2, v3, v4, v5, &cur_x, &cur_y);
+          xf86EloConvert(pInfo, first, num, v0, v1, v2, v3, v4, v5, &cur_x, &cur_y);
           DBG(3, ErrorF("EloConvert During Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, cur_x, cur_y));
-          xf86XInputSetScreen(local, priv->screen_no, cur_x, cur_y);
+          xf86XInputSetScreen(pInfo, priv->screen_no, cur_x, cur_y);
           DBG(3, ErrorF("EloConvert After Fix: Screen(%d) - x(%d), y(%d)\n", priv->screen_no, cur_x, cur_y));
 #endif
 
@@ -469,13 +469,13 @@ xf86EloReadInput(LocalDevicePtr	local)
            * location has changed as DIX assumes this. This is why we always
            * emit a motion, regardless of the kind of packet processed.
            */
-          xf86PostMotionEvent(local->dev, TRUE, 0, 2, cur_x, cur_y);
+          xf86PostMotionEvent(pInfo->dev, TRUE, 0, 2, cur_x, cur_y);
 
           /*
            * Emit a button press or release.
            */
           if (state == ELO_PRESS || state == ELO_RELEASE) {
-              xf86PostButtonEvent(local->dev, TRUE, 1, state == ELO_PRESS, 0, 2, cur_x, cur_y);
+              xf86PostButtonEvent(pInfo->dev, TRUE, 1, state == ELO_PRESS, 0, 2, cur_x, cur_y);
           }
 
           DBG(3, ErrorF("TouchScreen: x(%d), y(%d), %s\n",
@@ -483,7 +483,7 @@ xf86EloReadInput(LocalDevicePtr	local)
                       (state == ELO_PRESS) ? "Press" : ((state == ELO_RELEASE) ? "Release" : "Stream")));
       }
   }
-  while (xf86WaitForInput(local->fd, 0) > 0);  /* don't wait, just check */
+  while (xf86WaitForInput(pInfo->fd, 0) > 0);  /* don't wait, just check */
 }
 
 
@@ -771,8 +771,8 @@ static Bool
 xf86EloControl(DeviceIntPtr	dev,
 	       int		mode)
 {
-  LocalDevicePtr	local = (LocalDevicePtr) dev->public.devicePrivate;
-  EloPrivatePtr		priv = (EloPrivatePtr)(local->private);
+  InputInfoPtr	pInfo = (InputInfoPtr) dev->public.devicePrivate;
+  EloPrivatePtr		priv = (EloPrivatePtr)(pInfo->private);
   unsigned char		map[] = { 0, 1 };
   unsigned char		req[ELO_PACKET_SIZE];
   unsigned char		reply[ELO_PACKET_SIZE];
@@ -828,7 +828,7 @@ xf86EloControl(DeviceIntPtr	dev,
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) < 3
                   xf86GetMotionEvents,
 #endif
-					local->history_size, Absolute) == FALSE) {
+					pInfo->history_size, Absolute) == FALSE) {
 	ErrorF("Unable to allocate Elographics touchscreen ValuatorClassDeviceStruct\n");
 	return !Success;
       }
@@ -859,7 +859,7 @@ xf86EloControl(DeviceIntPtr	dev,
       /*
        * Allocate the motion events buffer.
        */
-      xf86MotionHistoryAllocate(local);
+      xf86MotionHistoryAllocate(pInfo);
 
 
       DBG(2, ErrorF("Done.\n"));
@@ -869,11 +869,11 @@ xf86EloControl(DeviceIntPtr	dev,
   case DEVICE_ON:
     DBG(2, ErrorF("Elographics touchscreen on...\n"));
 
-    if (local->fd < 0) {
+    if (pInfo->fd < 0) {
 
       DBG(2, ErrorF("Elographics touchscreen opening : %s\n", priv->input_dev));
-      local->fd = xf86OpenSerial(local->options);
-      if (local->fd < 0) {
+      pInfo->fd = xf86OpenSerial(pInfo->options);
+      if (pInfo->fd < 0) {
 	Error("Unable to open Elographics touchscreen device");
 	return !Success;
       }
@@ -886,7 +886,7 @@ xf86EloControl(DeviceIntPtr	dev,
            */
           memset(req, 0, ELO_PACKET_SIZE);
           req[1] = tolower(ELO_PARAMETER);
-          if (xf86EloSendQuery(req, reply, local->fd) != Success) {
+          if (xf86EloSendQuery(req, reply, pInfo->fd) != Success) {
               priv->is_a_2310 = 1;
               ErrorF("Not at the specified rate or model 2310, will continue\n");
           }
@@ -896,7 +896,7 @@ xf86EloControl(DeviceIntPtr	dev,
            */
           memset(req, 0, ELO_PACKET_SIZE);
           req[1] = tolower(ELO_ID);
-          if (xf86EloSendQuery(req, reply, local->fd) == Success) {
+          if (xf86EloSendQuery(req, reply, pInfo->fd) == Success) {
               xf86EloPrintIdent(reply, priv);
           }
           else {
@@ -911,7 +911,7 @@ xf86EloControl(DeviceIntPtr	dev,
           req[1] = ELO_MODE;
           req[3] = ELO_TOUCH_MODE | ELO_STREAM_MODE | ELO_UNTOUCH_MODE;
           req[4] = ELO_TRACKING_MODE;
-          if (xf86EloSendControl(req, local->fd) != Success) {
+          if (xf86EloSendControl(req, pInfo->fd) != Success) {
               DBG(2, ErrorF("Unable to change Elographics touchscreen operating mode... Maybe it's GeneralTouch touchscreen...\n"));
           }
 
@@ -922,11 +922,11 @@ xf86EloControl(DeviceIntPtr	dev,
           req[1] = ELO_REPORT;
           req[2] = priv->untouch_delay;
           req[3] = priv->report_delay;
-          if (xf86EloSendControl(req, local->fd) != Success) {
+          if (xf86EloSendControl(req, pInfo->fd) != Success) {
               DBG(2, ErrorF("Unable to change Elographics touchscreen reports timings... Maybe it's GeneralTouch touchscreen...\n"));
           }
       }
-      xf86AddEnabledDevice(local);
+      xf86AddEnabledDevice(pInfo);
       dev->public.on = TRUE;
     }
 
@@ -941,11 +941,11 @@ xf86EloControl(DeviceIntPtr	dev,
   case DEVICE_OFF:
     DBG(2, ErrorF("Elographics touchscreen off...\n"));
     dev->public.on = FALSE;
-    if (local->fd >= 0) {
-      xf86RemoveEnabledDevice(local);
+    if (pInfo->fd >= 0) {
+      xf86RemoveEnabledDevice(pInfo);
     }
-    SYSCALL(close(local->fd));
-    local->fd = -1;
+    SYSCALL(close(pInfo->fd));
+    pInfo->fd = -1;
     DBG(2, ErrorF("Done\n"));
     return Success;
 
@@ -956,11 +956,11 @@ xf86EloControl(DeviceIntPtr	dev,
   case DEVICE_CLOSE:
     DBG(2, ErrorF("Elographics touchscreen close...\n"));
     dev->public.on = FALSE;
-    if (local->fd >= 0) {
-	xf86RemoveEnabledDevice(local);
+    if (pInfo->fd >= 0) {
+	xf86RemoveEnabledDevice(pInfo);
     }
-    SYSCALL(close(local->fd));
-    local->fd = -1;
+    SYSCALL(close(pInfo->fd));
+    pInfo->fd = -1;
     DBG(2, ErrorF("Done\n"));
     return Success;
 
@@ -977,19 +977,19 @@ xf86EloControl(DeviceIntPtr	dev,
  *
  ***************************************************************************
  */
-static LocalDevicePtr
+static InputInfoPtr
 xf86EloAllocate(InputDriverPtr	drv, IDevPtr dev)
 {
-  LocalDevicePtr	local;
+  InputInfoPtr	pInfo;
   EloPrivatePtr		priv;
 
   priv = malloc(sizeof(EloPrivateRec));
   if (!priv)
     return NULL;
 
-  local = xf86AllocateInput(drv, 0);
+  pInfo = xf86AllocateInput(drv, 0);
 
-  if (!local) {
+  if (!pInfo) {
     free(priv);
     return NULL;
   }
@@ -1010,37 +1010,37 @@ xf86EloAllocate(InputDriverPtr	drv, IDevPtr dev)
   priv->packet_buf_p = 0;
   priv->swap_axes = 0;
 
-  local->name = xstrdup(dev->identifier);
-  local->flags = 0 /* XI86_NO_OPEN_ON_INIT */;
-  local->device_control = xf86EloControl;
-  local->read_input   = xf86EloReadInput;
-  local->control_proc = NULL;
-  local->close_proc   = NULL;
-  local->switch_mode  = NULL;
-  local->conversion_proc = xf86EloConvert;
-  local->reverse_conversion_proc = NULL;
-  local->fd	      = -1;
-  local->atom	      = 0;
-  local->dev	      = NULL;
-  local->private      = priv;
-  local->type_name    = "Elographics TouchScreen";
-  local->history_size = 0;
+  pInfo->name = xstrdup(dev->identifier);
+  pInfo->flags = 0 /* XI86_NO_OPEN_ON_INIT */;
+  pInfo->device_control = xf86EloControl;
+  pInfo->read_input   = xf86EloReadInput;
+  pInfo->control_proc = NULL;
+  pInfo->close_proc   = NULL;
+  pInfo->switch_mode  = NULL;
+  pInfo->conversion_proc = xf86EloConvert;
+  pInfo->reverse_conversion_proc = NULL;
+  pInfo->fd	      = -1;
+  pInfo->atom	      = 0;
+  pInfo->dev	      = NULL;
+  pInfo->private      = priv;
+  pInfo->type_name    = "Elographics TouchScreen";
+  pInfo->history_size = 0;
 
-  return local;
+  return pInfo;
 }
 
 
 static void
 xf86EloUninit(InputDriverPtr	drv,
-	      LocalDevicePtr	local,
+	      InputInfoPtr	pInfo,
 	      int flags)
 {
-  EloPrivatePtr		priv = (EloPrivatePtr) local->private;
+  EloPrivatePtr		priv = (EloPrivatePtr) pInfo->private;
 
   free(priv->input_dev);
   free(priv);
-  local->private = NULL;
-  xf86DeleteInput(local, 0);
+  pInfo->private = NULL;
+  xf86DeleteInput(pInfo, 0);
 }
 
 static const char *default_options[] = {
@@ -1057,7 +1057,7 @@ xf86EloInit(InputDriverPtr	drv,
 	    IDevPtr		dev,
 	    int			flags)
 {
-  LocalDevicePtr	local=NULL;
+  InputInfoPtr	pInfo=NULL;
   EloPrivatePtr		priv=NULL;
   char			*str;
   int			portrait = 0;
@@ -1066,18 +1066,18 @@ xf86EloInit(InputDriverPtr	drv,
   Model*		model;
 
 
-  local = xf86EloAllocate(drv, dev);
-  if (!local) {
+  pInfo = xf86EloAllocate(drv, dev);
+  if (!pInfo) {
     return NULL;
   }
-  priv = local->private;
-  local->conf_idev = dev;
+  priv = pInfo->private;
+  pInfo->conf_idev = dev;
 
-  xf86CollectInputOptions(local, default_options, NULL);
+  xf86CollectInputOptions(pInfo, default_options, NULL);
   /* Process the common options. */
-  xf86ProcessCommonOptions(local, local->options);
+  xf86ProcessCommonOptions(pInfo, pInfo->options);
 
-  str = xf86FindOptionValue(local->options, "Device");
+  str = xf86FindOptionValue(pInfo->options, "Device");
   if (!str) {
     xf86Msg(X_ERROR, "%s: No Device specified in Elographics module config.\n",
 	    dev->identifier);
@@ -1087,11 +1087,11 @@ xf86EloInit(InputDriverPtr	drv,
       }
       free(priv);
     }
-    return local;
+    return pInfo;
   }
   priv->input_dev = strdup(str);
 
-  opt_model = xf86SetStrOption(local->options, "Model", NULL);
+  opt_model = xf86SetStrOption(pInfo->options, "Model", NULL);
   model = SupportedModels;
   priv->model = MODEL_UNKNOWN;
   while(model->type != MODEL_UNKNOWN && opt_model)
@@ -1104,27 +1104,27 @@ xf86EloInit(InputDriverPtr	drv,
       model++;
   }
 
-  local->name = xf86SetStrOption(local->options, "DeviceName", XI_TOUCHSCREEN);
-  xf86Msg(X_CONFIG, "Elographics X device name: %s\n", local->name);
-  priv->screen_no = xf86SetIntOption(local->options, "ScreenNo", 0);
+  pInfo->name = xf86SetStrOption(pInfo->options, "DeviceName", XI_TOUCHSCREEN);
+  xf86Msg(X_CONFIG, "Elographics X device name: %s\n", pInfo->name);
+  priv->screen_no = xf86SetIntOption(pInfo->options, "ScreenNo", 0);
   xf86Msg(X_CONFIG, "Elographics associated screen: %d\n", priv->screen_no);
-  priv->untouch_delay = xf86SetIntOption(local->options, "UntouchDelay", ELO_UNTOUCH_DELAY);
+  priv->untouch_delay = xf86SetIntOption(pInfo->options, "UntouchDelay", ELO_UNTOUCH_DELAY);
   xf86Msg(X_CONFIG, "Elographics untouch delay: %d ms\n", priv->untouch_delay*10);
-  priv->report_delay = xf86SetIntOption(local->options, "ReportDelay", ELO_REPORT_DELAY);
+  priv->report_delay = xf86SetIntOption(pInfo->options, "ReportDelay", ELO_REPORT_DELAY);
   xf86Msg(X_CONFIG, "Elographics report delay: %d ms\n", priv->report_delay*10);
-  priv->max_x = xf86SetIntOption(local->options, "MaxX", 3000);
+  priv->max_x = xf86SetIntOption(pInfo->options, "MaxX", 3000);
   xf86Msg(X_CONFIG, "Elographics maximum x position: %d\n", priv->max_x);
-  priv->min_x = xf86SetIntOption(local->options, "MinX", 0);
+  priv->min_x = xf86SetIntOption(pInfo->options, "MinX", 0);
   xf86Msg(X_CONFIG, "Elographics minimum x position: %d\n", priv->min_x);
-  priv->max_y = xf86SetIntOption(local->options, "MaxY", 3000);
+  priv->max_y = xf86SetIntOption(pInfo->options, "MaxY", 3000);
   xf86Msg(X_CONFIG, "Elographics maximum y position: %d\n", priv->max_y);
-  priv->min_y = xf86SetIntOption(local->options, "MinY", 0);
+  priv->min_y = xf86SetIntOption(pInfo->options, "MinY", 0);
   xf86Msg(X_CONFIG, "Elographics minimum y position: %d\n", priv->min_y);
-  priv->swap_axes = xf86SetBoolOption(local->options, "SwapXY", 0);
+  priv->swap_axes = xf86SetBoolOption(pInfo->options, "SwapXY", 0);
   if (priv->swap_axes) {
     xf86Msg(X_CONFIG, "Elographics device will work with X and Y axes swapped\n");
   }
-  debug_level = xf86SetIntOption(local->options, "DebugLevel", 0);
+  debug_level = xf86SetIntOption(pInfo->options, "DebugLevel", 0);
   if (debug_level) {
 #if DEBUG
     xf86Msg(X_CONFIG, "Elographics debug level sets to %d\n", debug_level);
@@ -1132,7 +1132,7 @@ xf86EloInit(InputDriverPtr	drv,
     xf86Msg(X_INFO, "Elographics debug not available\n");
 #endif
   }
-  str = xf86SetStrOption(local->options, "PortraitMode", "Landscape");
+  str = xf86SetStrOption(pInfo->options, "PortraitMode", "Landscape");
   if (strcmp(str, "Portrait") == 0) {
     portrait = 1;
   }
@@ -1149,14 +1149,14 @@ xf86EloInit(InputDriverPtr	drv,
   height = priv->max_y - priv->min_y;
   if (width == 0) {
     xf86Msg(X_ERROR, "Elographics: Cannot configure touchscreen with width 0\n");
-    return local;
+    return pInfo;
   }
   else if (width < 0) {
     xf86Msg(X_INFO, "Elographics: reverse x mode (minimum x position >= maximum x position)\n");
   }
   if (height == 0) {
     xf86Msg(X_ERROR, "Elographics: Cannot configure touchscreen with height 0\n");
-    return local;
+    return pInfo;
   }
   else if (height < 0) {
     xf86Msg(X_INFO, "Elographics: reverse y mode (minimum y position >= maximum y position)\n");
@@ -1184,8 +1184,8 @@ xf86EloInit(InputDriverPtr	drv,
   }
 
   /* mark the device configured */
-  local->flags |= XI86_CONFIGURED;
-  return local;
+  pInfo->flags |= XI86_CONFIGURED;
+  return pInfo;
 }
 
 _X_EXPORT InputDriverRec ELOGRAPHICS = {
