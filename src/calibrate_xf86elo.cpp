@@ -144,7 +144,12 @@ public:
 			fprintf(stderr,"MaxX:%d\n",priv->max_x);
 			fprintf(stderr,"MinY:%d\n",priv->max_y);
 		}
-		showFullScreen();
+
+		// Mimmic showFullScreen with the exception that activateWindow() is not called since it
+		// makes keyboardfocus misbehave when running without a window manager.
+		ensurePolished();
+		setWindowState((windowState() & ~(Qt::WindowMinimized | Qt::WindowMaximized)) | Qt::WindowFullScreen);
+		show();
 		repaint();
 	}
 
