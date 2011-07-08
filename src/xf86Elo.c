@@ -892,7 +892,7 @@ xf86EloAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
   pInfo->control_proc = NULL;
   pInfo->switch_mode  = NULL;
   pInfo->private      = priv;
-  pInfo->type_name    = "Elographics TouchScreen";
+  pInfo->type_name    = XI_TOUCHSCREEN;
 
   return Success;
 }
@@ -967,8 +967,6 @@ xf86EloInit(InputDriverPtr	drv,
       model++;
   }
 
-  pInfo->name = xf86SetStrOption(pInfo->options, "DeviceName", XI_TOUCHSCREEN);
-  xf86Msg(X_CONFIG, "Elographics X device name: %s\n", pInfo->name);
   priv->screen_no = xf86SetIntOption(pInfo->options, "ScreenNo", 0);
   xf86Msg(X_CONFIG, "Elographics associated screen: %d\n", priv->screen_no);
   priv->untouch_delay = xf86SetIntOption(pInfo->options, "UntouchDelay", ELO_UNTOUCH_DELAY);
