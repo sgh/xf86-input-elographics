@@ -850,7 +850,7 @@ xf86EloControl(DeviceIntPtr	dev,
 
   default:
       ErrorF("unsupported mode=%d\n", mode);
-      return !Success;
+      return BadValue;
   }
 }
 
