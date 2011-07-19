@@ -940,7 +940,7 @@ xf86EloInit(InputDriverPtr	drv,
 
   priv = pInfo->private;
 
-  str = xf86FindOptionValue(pInfo->options, "Device");
+  str = xf86SetStrOption(pInfo->options, "Device", NULL);
   if (!str) {
     xf86Msg(X_ERROR, "%s: No Device specified in Elographics module config.\n",
 	    pInfo->name);
