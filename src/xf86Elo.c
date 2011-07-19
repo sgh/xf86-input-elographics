@@ -945,7 +945,16 @@ xf86EloInit(InputDriverPtr	drv,
     xf86Msg(X_ERROR, "%s: No Device specified in Elographics module config.\n",
 	    pInfo->name);
     return BadValue;
+  } else {
+      pInfo->fd = xf86OpenSerial(pInfo->options);
+      if (pInfo->fd < 0) {
+	xf86Msg(X_ERROR, "%s: Unable to open Elographics touchscreen device %s", pInfo->name, str);
+	return BadValue;
+      }
+      xf86CloseSerial(pInfo->fd);
+      pInfo->fd = -1;
   }
+
   priv->input_dev = strdup(str);
 
   opt_model = xf86SetStrOption(pInfo->options, "Model", NULL);
