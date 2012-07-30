@@ -66,7 +66,7 @@
 
 typedef struct {
     int         type;
-    char        *name;
+    const char  *name;
 } Model;
 
 static Model SupportedModels[] =
@@ -911,7 +911,11 @@ xf86EloUninit(InputDriverPtr	drv,
   xf86DeleteInput(pInfo, 0);
 }
 
-static char *default_options[] = {
+static
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 18
+const
+#endif
+char *default_options[] = {
   "BaudRate", "9600",
   "StopBits", "1",
   "DataBits", "8",
@@ -926,7 +930,7 @@ xf86EloInit(InputDriverPtr	drv,
 	    int			flags)
 {
   EloPrivatePtr		priv=NULL;
-  char			*str;
+  const char		*str;
   int			portrait = 0;
   int			height, width;
   char			*opt_model;
