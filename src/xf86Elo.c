@@ -248,7 +248,7 @@ xf86EloGetPacket(unsigned char	*buffer,
    * Okay, give up.
    */
   if (num_bytes < 0) {
-    Error("System error while reading from Elographics touchscreen.");
+    ErrorF("System error while reading from Elographics touchscreen.");
     return !Success;
   }
   DBG(4, ErrorF("Read %d bytes\n", num_bytes));
@@ -758,7 +758,7 @@ xf86EloControl(DeviceIntPtr	dev,
       DBG(2, ErrorF("Elographics touchscreen opening : %s\n", priv->input_dev));
       pInfo->fd = xf86OpenSerial(pInfo->options);
       if (pInfo->fd < 0) {
-	Error("Unable to open Elographics touchscreen device");
+	ErrorF("Unable to open Elographics touchscreen device");
 	return !Success;
       }
 
