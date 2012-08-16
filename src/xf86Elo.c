@@ -199,7 +199,7 @@ typedef struct _EloShmRec {
 
 typedef struct _EloPrivateRec {
   char		*input_dev;		/* The touchscreen input tty			*/
-  EloShmPtr	eloshm;			/* Shared memory, or xalloced memory */
+  EloShmPtr	eloshm;			/* Shared memory, or malloced memory */
   int		screen_no;		/* Screen associated with the device		*/
   int		screen_width;		/* Width of the associated X screen		*/
   int		screen_height;		/* Height of the screen				*/
@@ -739,14 +739,14 @@ xf86EloControl(DeviceIntPtr	dev,
 	/* I will map coordinates myself */
 	InitValuatorAxisStruct(dev, 0,
 			       axis_labels[0],
-			       priv->min_x, priv->max_x,
+			       priv->eloshm->min_x, priv->eloshm->max_x,
 			       9500,
 			       0     /* min_res */,
 			       9500  /* max_res */,
 			       Absolute);
 	InitValuatorAxisStruct(dev, 1,
 			       axis_labels[1],
-			       priv->min_y, priv->max_y,
+			       priv->eloshm->min_y, priv->eloshm->max_y,
 			       10500,
 			       0     /* min_res */,
 			       10500 /* max_res */,
@@ -911,7 +911,7 @@ xf86EloAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
       return NULL;
     }
   } else {
-    priv->eloshm = xalloc(sizeof(EloShmRec));
+    priv->eloshm = malloc(sizeof(EloShmRec));
     if (!priv->eloshm)
       return NULL;
   }
