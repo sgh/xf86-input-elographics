@@ -191,8 +191,8 @@ public:
 		priv->min_x = minx;
 		priv->max_x = maxx;
 
-		priv->min_y = maxy;
-		priv->max_y = miny;
+		priv->min_y = miny;
+		priv->max_y = maxy;
 
 		if (be_verbose) {
 			fprintf(stderr,"New calibration :\n");
