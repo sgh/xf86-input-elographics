@@ -933,7 +933,6 @@ xf86EloAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
   priv->packet_buf_p = 0;
   priv->eloshm->swap_axes = 0;
 
-  pInfo->flags = 0 /* XI86_NO_OPEN_ON_INIT */;
   pInfo->device_control = xf86EloControl;
   pInfo->read_input   = xf86EloReadInput;
   pInfo->control_proc = NULL;
