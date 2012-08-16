@@ -61,6 +61,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>        /* For mode constants */
 #include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 /**
  * models to be treated specially.
